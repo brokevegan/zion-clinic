@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Zion Clinic</title>
+<link rel="stylesheet" href="style.css">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Zion Clinic">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="theme-color" content="#F1F7E9">
+</head>
+<body>
+<header class="top">
+  <img src="logo.png" alt="Zion Community" class="logo">
+  <div class="app-name">Zion Clinic</div>
+  <button class="syncbtn" data-act="openSync">Sync<span id="syncBadge" class="badge hidden"></span></button>
+</header>
+<div class="stripe"><span class="s1"></span><span class="s2"></span><span class="s3"></span></div>
+<nav id="tabs" class="tabbar" aria-label="Sections"></nav>
+<main id="view"></main>
+<div id="modal" class="modal hidden" role="dialog" aria-modal="true"><div class="sheet" id="sheet"></div></div>
+<div id="lock" class="lock hidden"></div>
+<div id="toast" class="toast hidden"></div>
+<script src="lists.js"></script>
+<script src="web_bridge.js"></script>
+<script src="logo_data.js"></script>
+<script src="vendor/jspdf.umd.min.js"></script>
+<script src="vendor/jspdf.plugin.autotable.min.js"></script>
+<script src="reports.js"></script>
+<script src="pdf.js"></script>
+<script src="app.js"></script>
+<script src="store.js"></script>
+<script src="pages.js"></script>
+<script src="photos.js"></script>
+<script src="reportspage.js"></script>
+<script src="sync.js"></script>
+<script src="main.js"></script>
+</body>
+</html>
