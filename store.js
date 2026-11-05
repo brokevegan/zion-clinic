@@ -362,7 +362,8 @@ function parseAge(raw) {
   if (raw === null || raw === undefined) return null;
   let s = String(raw).trim().toLowerCase();
   if (!s || ["na", "n/a", "nd", "-", "none", "unknown"].includes(s)) return null;
-  s = s.replace(/(?<=\d)o(?=n)|\band\b|(?<=\d)and(?=\d)|&/g, m => (m === "o" ? "0" : " "));
+  // Nothing here may look behind in a regular expression: Safari before 16.4 (the iPad Air 2 stops at 15) then refuses this whole file.
+  s = s.replace(/(\d)o(?=n)|\band\b|(\d)and(?=\d)|&/g, (m, a, b) => (a ? a + "0" : b ? b + " " : " "));
   let total = 0, found = false;
   const frac = /(\d+(?:\.\d+)?)\s*\/\s*(12|52|7|2)\b/g;
   for (const m of s.matchAll(frac)) {
@@ -393,7 +394,13 @@ const EYE_OTHER = /myop|hyperop|pteryg|glaucom|ulcer|phakia|ectropi|entropi|infl
 
 function glassesPower(text) {
   const t = (text || "").replace(/\b\d+\s*\/\s*\d+\b/g, " ").replace(/\b(?:x|tds|bd|od|qid)\s*\d+/gi, " ");
-  for (const m of t.matchAll(/(?<![\d/.])([+-])?\s*(\d)(?:[.,](\d{1,2}))?(?![\d/])/g)) {
+  const re = /([+-])?\s*(\d)(?:[.,](\d{1,2}))?(?![\d/])/y;   // tried at each place not straight after a digit, / or .
+  for (let i = 0; i < t.length; i++) {
+    if (i && /[\d/.]/.test(t[i - 1])) continue;
+    re.lastIndex = i;
+    const m = re.exec(t);
+    if (!m) continue;
+    i = re.lastIndex - 1;
     const whole = Number(m[2]);
     if (whole > 6 || (!m[3] && !m[1] && !/^\s*\.?\+?\d\s*$/.test(t))) continue;
     return `${m[1] || "+"}${whole}.${(m[3] || "0").padEnd(2, "0").slice(0, 2)}`;

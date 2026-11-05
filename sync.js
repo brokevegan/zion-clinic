@@ -12,16 +12,16 @@ function call(fn) {
   });
 }
 
-/* ---- the iPhone: a Home Screen app cannot call the laptop's plain http address, so changes go by locked files. */
+/* ---- the iPhone and iPad: a Home Screen app cannot call the laptop's plain http address, so changes go by locked files. */
 function fileSyncPage() {
-  const pending = toSend().length + DATA.deleted.length, ops = Clinic.pendingCount(), busy = syncState && syncState.busy;
+  const pending = toSend().length + DATA.deleted.length, ops = Clinic.pendingCount(), busy = syncState && syncState.busy, dev = NATIVE.deviceName();
   const bits = [];
-  if (ops) bits.push(`${ops} change${ops === 1 ? "" : "s"} made on this phone`);
+  if (ops) bits.push(`${ops} change${ops === 1 ? "" : "s"} made on this ${dev}`);
   if (pending) bits.push(`${pending} ${pending === 1 ? "tally" : "tallies"}`);
   return `<h2 style="margin-top:4px">Sync with the computer</h2>
-    <div class="card"><b>On the laptop:</b> open Zion Clinic and press <b>Sync with phone</b>. Point the iPhone's Camera at the
-      code marked <b>iPhone</b>, and open the page in Safari. The iPhone and the laptop must be on the same Wi-Fi.</div>
-    <p>${bits.length ? `<b>Waiting to go:</b> ${bits.join(", ")}.` : "Nothing is waiting on this phone."}</p>
+    <div class="card"><b>On the laptop:</b> open Zion Clinic and press <b>Sync with phone</b>. Point the ${dev}'s Camera at the
+      code marked <b>iPhone / iPad</b>, and open the page in Safari. The ${dev} and the laptop must be on the same Wi-Fi.</div>
+    <p>${bits.length ? `<b>Waiting to go:</b> ${bits.join(", ")}.` : `Nothing is waiting on this ${dev}.`}</p>
     <h3>1. Send your changes</h3>
     <button class="send wide" data-act="fileMake" ${busy ? "disabled" : ""}>Make the file for the computer</button>
     <p class="muted">Then press Share below, choose Save to Files, and on the laptop's page in Safari choose that file and press Send.</p>
@@ -30,16 +30,16 @@ function fileSyncPage() {
     <p class="muted">On the same page in Safari, press Download the latest data. Then come back here.</p>
     <button class="primary wide" data-act="fileOpenData" ${busy ? "disabled" : ""}>Open the file from the computer</button>
     ${syncState && syncState.message ? `<div class="result ${syncState.ok ? "ok" : "bad"}">${syncState.message}</div>` : ""}
-    ${Clinic.has() ? `<p class="muted">Records on this phone are from ${esc(ZR.fmtDate(Clinic.base.made.slice(0, 10)))} ${esc(Clinic.base.made.slice(11))}.</p>` : ""}
+    ${Clinic.has() ? `<p class="muted">Records on this ${dev} are from ${esc(ZR.fmtDate(Clinic.base.made.slice(0, 10)))} ${esc(Clinic.base.made.slice(11))}.</p>` : ""}
     <p class="muted">If the same record was changed in both places, the latest change is kept.</p>
-    <h3>Backup</h3><p class="muted">Makes one file with everything on this phone, locked with your backup password. Then choose Google Drive in the Share list, or Save to Files.</p>
+    <h3>Backup</h3><p class="muted">Makes one file with everything on this ${dev}, locked with your backup password. Then choose Google Drive in the Share list, or Save to Files.</p>
     <button class="wide" data-act="backupNow" ${busy ? "disabled" : ""}>Back up to Google Drive…</button>
     <button class="wide small" data-act="backupRestore" ${busy ? "disabled" : ""}>Restore from a backup…</button>
     <h3>This app</h3>
     <button class="wide small" data-act="syncCodeChange">Change the sync code</button>
     <button class="wide small" data-act="pinChange">Change the PIN</button>
     <button class="wide small" data-act="lockNow">Lock now</button>
-    <p class="muted" style="text-align:center;margin-top:18px">Zion Clinic ${esc(LISTS.appVersion)} for iPhone</p>`;
+    <p class="muted" style="text-align:center;margin-top:18px">Zion Clinic ${esc(LISTS.appVersion)} for ${dev}</p>`;
 }
 
 async function askSyncCode(message) {

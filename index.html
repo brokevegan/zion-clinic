@@ -25,6 +25,26 @@
 <div id="modal" class="modal hidden" role="dialog" aria-modal="true"><div class="sheet" id="sheet"></div></div>
 <div id="lock" class="lock hidden"></div>
 <div id="toast" class="toast hidden"></div>
+<script>
+(function () {
+  function show(text) {   // above the PIN screen too, which opens even when the rest of the app cannot
+    var v = document.getElementById("view");
+    if (!v || v.children.length || document.getElementById("stopped")) return;
+    var d = document.createElement("div");
+    d.id = "stopped";
+    d.className = "card";
+    d.style.cssText = "position:fixed;left:12px;right:12px;bottom:12px;z-index:99";
+    d.innerHTML = '<b>This device could not start Zion Clinic.</b><p class="muted"></p><p>Please send a photo of this screen to whoever looks after the app.</p>';
+    d.querySelector("p").textContent = text;
+    document.body.appendChild(d);
+  }
+  window.addEventListener("error", function (e) {   // "true" below also hears a file that could not be fetched
+    if (e.target && e.target.tagName === "SCRIPT") show("The file " + String(e.target.src).split("/").pop() + " could not be loaded.");
+    else if (e.message) show(e.message + " (" + String(e.filename).split("/").pop() + ", line " + e.lineno + ")");
+  }, true);
+  window.addEventListener("unhandledrejection", function (e) { show(String(e.reason)); });
+})();
+</script>
 <script src="lists.js"></script>
 <script src="web_bridge.js"></script>
 <script src="logo_data.js"></script>

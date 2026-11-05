@@ -145,7 +145,7 @@
     fileClose() { openText = null; },
     fileWrite(name, text) { set("file:" + name, text); return true; },
     buzz() {},
-    deviceName() { return "iPhone"; },
+    deviceName() { return /iPad/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1) ? "iPad" : "iPhone"; },   // an iPad's Safari calls itself a Mac
     localIps() { return "[]"; },
 
     pinIsSet() { return mem.has("lock:hash"); },
@@ -260,6 +260,7 @@
       const start = off + 30 + v.getUint16(off + 26, true) + v.getUint16(off + 28, true);
       let data = b.subarray(start, start + csize);
       if (method === 8) {
+        if (typeof DecompressionStream === "undefined") throw new Error("This backup was made on an Android phone, and this device's software is too old to open it (it needs version 16.4).");
         const s = new Blob([data]).stream().pipeThrough(new DecompressionStream("deflate-raw"));
         data = new Uint8Array(await new Response(s).arrayBuffer());
       }
