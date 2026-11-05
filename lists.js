@@ -1,6 +1,6 @@
 /* Made by build.py from the computer program's lists - do not edit. */
 window.ZION_LISTS = {
- "appVersion": "2.0",
+ "appVersion": "2.1",
  "locations": [
   "Static",
   "Buwesonga",

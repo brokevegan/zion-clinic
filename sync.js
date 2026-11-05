@@ -139,14 +139,14 @@ PAGES.sync = () => {
     `<span class="muted">Not paired yet. The first time, you will be asked for the 4-number code shown on the computer.</span>`}
     ${Clinic.has() ? `<div class="muted" style="margin-top:6px">Records on this phone are from ${esc(ZR.fmtDate(Clinic.base.made.slice(0, 10)))} ${esc(Clinic.base.made.slice(11))}.</div>` : ""}</div>`;
   if (c) h += `<button class="wide small" data-act="forgetComputer" ${busy ? "disabled" : ""}>Forget this computer</button>`;
-  h += `<h3>Backup</h3><p class="muted">Makes one file with everything on this phone, locked with your backup password. Then choose Google Drive in the Share list, or save it to the phone.</p>
+  if (!FINANCE) h += `<h3>Backup</h3><p class="muted">Makes one file with everything on this phone, locked with your backup password. Then choose Google Drive in the Share list, or save it to the phone.</p>
     <button class="wide" data-act="backupNow" ${busy ? "disabled" : ""}>Back up to Google Drive…</button>
     <button class="wide small" data-act="backupRestore" ${busy ? "disabled" : ""}>Restore from a backup…</button>
-    <div id="ready">${typeof readyHtml === "function" ? readyHtml() : ""}</div>
-    <h3>This app</h3>
+    <div id="ready">${typeof readyHtml === "function" ? readyHtml() : ""}</div>`;
+  h += `<h3>This app</h3>
     <button class="wide small" data-act="pinChange">Change the PIN</button>
     <button class="wide small" data-act="lockNow">Lock now</button>
-    <p class="muted" style="text-align:center;margin-top:18px">Zion Clinic ${esc(LISTS.appVersion)}</p>`;
+    <p class="muted" style="text-align:center;margin-top:18px">${APP_TITLE} ${esc(LISTS.appVersion)}</p>`;
   return h;
 };
 
@@ -342,7 +342,7 @@ const Lock = {
   draw(message) {
     const keys = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "bio", "0", "back"];
     const bio = NATIVE && NATIVE.bioAvailable();
-    $("#lock").innerHTML = `<img src="logo.png" alt="Zion Community" class="lock-logo"><div class="app-name">Zion Clinic</div>
+    $("#lock").innerHTML = `<img src="logo.png" alt="Zion Community" class="lock-logo"><div class="app-name">${APP_TITLE}</div>
       <p class="${message ? "pos" : "muted"}">${message || "Enter your PIN"}</p>
       <div class="display dots">${"●".repeat(this.entered.length) || " "}</div>
       <div class="keypad">${keys.map(k => (k === "bio" ? (bio ? `<button data-act="lockBio" aria-label="Use fingerprint">👆</button>` : `<span></span>`) :
@@ -381,8 +381,8 @@ const Lock = {
   },
 
   async firstPin() {
-    $("#lock").innerHTML = `<img src="logo.png" alt="Zion Community" class="lock-logo"><div class="app-name">Zion Clinic</div>
-      <p class="muted">This app holds patient records, so it needs a PIN${NATIVE.bioAvailable() ? " (and your fingerprint)" : ""}.</p>
+    $("#lock").innerHTML = `<img src="logo.png" alt="Zion Community" class="lock-logo"><div class="app-name">${APP_TITLE}</div>
+      <p class="muted">This app holds ${FINANCE ? "the clinic's money records" : "patient records"}, so it needs a PIN${NATIVE.bioAvailable() ? " (and your fingerprint)" : ""}.</p>
       <button class="primary wide" data-act="lockSetup">Choose a PIN</button>`;
   },
 };

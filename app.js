@@ -5,6 +5,8 @@
 
 const LISTS = window.ZION_LISTS;              // lists.js, made from the computer program's lists
 const NATIVE = window.ZionAndroid || null;    // the Android app; missing when opened in a browser to test
+const FINANCE = LISTS.edition === "finance";  // Zion Finance, for finance staff: the money tabs only, no patient details
+const APP_TITLE = FINANCE ? "Zion Finance" : "Zion Clinic";
 const PORT = 8765;
 const SEXES = [["m", "Boys"], ["f", "Girls"]];
 const HIV_SEXES = [["m", "Male"], ["f", "Female"]];
@@ -57,7 +59,7 @@ function save() {
 }
 
 function buzz() { try { if (NATIVE) NATIVE.buzz(); } catch (e) { /* no vibration */ } }
-function deviceName() { try { return NATIVE ? NATIVE.deviceName() : "Browser test"; } catch (e) { return "Phone"; } }
+function deviceName() { try { return NATIVE ? NATIVE.deviceName() + (FINANCE ? " (Zion Finance)" : "") : "Browser test"; } catch (e) { return "Phone"; } }
 
 // ------------------------------------------------------------------ tallies
 const groupOf = age => LISTS.groups.find(g => g.age === age);
@@ -144,9 +146,11 @@ let view = {name: "home"};
 let flashId = null;
 
 /* The tabs along the top, and which tab each screen belongs to. */
-const TABS = [["home", "Tallies"], ["billing", "Patient Billing"], ["eye", "Eye Camps"], ["hiv", "HIV Tests"],
-  ["money", "Revenue & Expenses"], ["reports", "Reports"], ["tally", "Tally Sheets"], ["cash", "Cash Book"], ["receipt", "Receipts"]];
+const TABS = FINANCE ? [["money", "Revenue & Expenses"], ["receipt", "Receipts"], ["cash", "Cash Book"], ["reports", "Reports"]] :
+  [["home", "Tallies"], ["billing", "Patient Billing"], ["eye", "Eye Camps"], ["hiv", "HIV Tests"],
+    ["money", "Revenue & Expenses"], ["reports", "Reports"], ["tally", "Tally Sheets"], ["cash", "Cash Book"], ["receipt", "Receipts"]];
 const TAB_OF = {session: "home", immlist: "home", names: "money", sync: ""};
+if (FINANCE) TAB_OF.home = "money";   // its first screen is the ledger (PAGES.home in pages.js)
 const PAGES = {};
 const BACK = {session: "home", immlist: "home", names: "money"};   // the phone's back button
 
@@ -205,7 +209,7 @@ function renderHome() {
       <div class="muted">${esc(summaryText(s))}</div></div>
       <span class="status ${cls}">${label}</span></div>`;
   }
-  return h;
+  return h + `<h2>Immunisation history</h2>${immHistory()}`;
 }
 
 function counterRow(label, ref, value, what) {

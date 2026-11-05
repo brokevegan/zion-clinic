@@ -21,6 +21,7 @@
   const NOT_RECORDED = "Not recorded";
 
   const CASH_FLOW = { "Cash flow - daily": "day", "Cash flow - weekly": "week", "Cash flow - monthly": "month" };
+  const EXPENSES = { "Expenses - daily": "day", "Expenses - weekly": "week", "Expenses - monthly": "month" };   // Zion Finance
   const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
   const KINDS = {
     money: ["Summary by cost code", "Monthly by cost code", "All transactions", BY_PERSON].concat(Object.keys(CASH_FLOW)),
@@ -32,6 +33,7 @@
   };
 
   function modeOf(kind) {
+    if (EXPENSES[kind]) return "money";
     for (const m in KINDS) if (KINDS[m].indexOf(kind) >= 0) return m;
     throw new Error("Unknown report: " + kind);
   }
@@ -287,6 +289,27 @@
     bold("Closing balance", "", undefined, undefined, bal);
   }
 
+  /* One line per day, week or month with the money paid out, and its entries underneath. */
+  function expensesByPeriod(rep, kind, sel, start, end, detail) {
+    rep.columns = ["Date", "Description", "Code", "Paid to", "Money Out"];
+    rep.money_cols = [4];
+    rep.widths = [130, 320, 50, 150, 105];
+    const bold = (label, description, moneyOut) => addTotal(rep, [label, description, "", "", moneyOut]);
+    const entr = n => n + " entr" + (n === 1 ? "y" : "ies");
+    const periods = new Map();
+    for (const e of sel) {
+      const [key, label] = cashPeriod(e.date, EXPENSES[kind], start, end);
+      if (!periods.has(key)) periods.set(key, { label: label, items: [] });
+      periods.get(key).items.push(e);
+    }
+    for (const key of Array.from(periods.keys()).sort()) {
+      const { label, items } = periods.get(key);
+      bold(label, entr(items.length), sum(items, e => e.amount_out));
+      if (detail) for (const e of items) rep.rows.push([fmtDate(e.date), e.description, e.code || "-", e.to_party, e.amount_out]);
+    }
+    bold("TOTAL", entr(sel.length), sum(sel, e => e.amount_out));
+  }
+
   function moneyReport(D, kind, start, end, codes, search, person, detail) {
     const entries = D.entries;
     if (CASH_FLOW[kind]) {   // a cash flow always covers all the money, so its balances are true
@@ -302,6 +325,7 @@
     let sel = filterEntries(D, entries, start, end, codes, search);
     const who = kind === BY_PERSON ? (person || "").trim().toLowerCase() : "";
     if (who) sel = sel.filter(e => e.from_party.toLowerCase().indexOf(who) >= 0 || e.to_party.toLowerCase().indexOf(who) >= 0);
+    if (EXPENSES[kind]) sel = sel.filter(e => e.date && e.amount_out);
     const rep = newRep(kind, start, end, { codes: codes.slice(), person: who ? (person || "").trim() : "" });
     const totalRow = (label, values, labelCol) => addTotal(rep, new Array(labelCol || 0).fill("").concat([label], values));
     const name = c => (c in D.codeName ? D.codeName[c] : UNCODED_LABEL);
@@ -412,10 +436,18 @@
         ["", "", entr(nAll), tin, tout]);
     } else if (CASH_FLOW[kind]) {
       cashFlow(rep, kind, entries, sel.filter(e => e.date), start, end, detail);
+    } else if (EXPENSES[kind]) {
+      expensesByPeriod(rep, kind, sel, start, end, detail);
     } else {
       throw new Error(kind);
     }
     rep.chart = moneyChart(D, kind, sel, entries, start, end, codes, search || who);
+    if (EXPENSES[kind]) {   // money out only
+      rep.chart.pies = rep.chart.pies.slice(1);
+      rep.chart.bars.title = "Money out by month (UGX)";
+      rep.chart.bars.series = rep.chart.bars.series.slice(1);
+      rep.chart.line = null;
+    }
     return rep;
   }
 
@@ -852,7 +884,7 @@
   }
 
   global.ZR = {
-    CLINIC, UNCODED, UNCODED_LABEL, BY_PERSON, CASH_FLOW, KINDS, NONE_LABEL, HIV_AGE_GROUPS, HIV_AGE_LABEL, NOT_MAPPED, NOT_RECORDED,
+    CLINIC, UNCODED, UNCODED_LABEL, BY_PERSON, CASH_FLOW, EXPENSES, KINDS, NONE_LABEL, HIV_AGE_GROUPS, HIV_AGE_LABEL, NOT_MAPPED, NOT_RECORDED,
     MONTHS, modeOf, prepare, build, caption, codeLabel, fmtNum, fmtDate, pyFixed, pyRound, isoToday, monthList,
   };
 })(typeof window !== "undefined" ? window : globalThis);

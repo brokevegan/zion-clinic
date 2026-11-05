@@ -174,6 +174,26 @@ table.rep tr.total td { background: var(--green-light); font-weight: 700; }
 .toast { z-index: 30; }
 .modal { z-index: 20; }
 
+/* History lists: the computer's table, headings and one column kept in view while it slides */
+.hint { margin: 2px 0 6px; font-size: 13px; }
+.history { overflow: auto; max-height: 72vh; background: #fff; border: 1px solid var(--line); border-radius: 10px; }
+table.hist { border-collapse: separate; border-spacing: 0; font-size: 14px; }
+table.hist th { position: sticky; top: 0; z-index: 2; background: var(--green); color: #fff; padding: 8px; text-align: left; white-space: nowrap; font-weight: 600; }
+table.hist td { padding: 9px 8px; border-bottom: 1px solid var(--line); background: #fff; white-space: nowrap; vertical-align: top; }
+table.hist .r { text-align: right; }
+table.hist .c { text-align: center; }
+table.hist td.w { white-space: normal; min-width: 170px; max-width: 260px; overflow-wrap: anywhere; }
+table.hist .s { position: sticky; left: 0; z-index: 1; min-width: 100px; max-width: 150px; white-space: normal; overflow-wrap: anywhere; box-shadow: 1px 0 0 var(--line); }
+table.hist th.s { z-index: 3; }
+table.hist tbody tr:active td { background: var(--green-light); }
+tr.c-out td { color: #B5462B; }
+tr.c-warn td { color: #9A6A00; }
+tr.c-muted td { color: var(--muted); }
+tr.c-camp td { color: #6250D6; }
+tr.c-auto td { background: #F1F6EA; color: #3D4A44; }
+tr.c-uncoded td { background: #FFF4D6; }
+@media (min-width: 800px) { main { max-width: none; } }  /* a phone turned sideways shows more columns */
+
 /* iPhone: room for the Dynamic Island and the home bar */
 .top { padding-top: calc(6px + env(safe-area-inset-top)); padding-left: calc(12px + env(safe-area-inset-left)); padding-right: calc(12px + env(safe-area-inset-right)); }
 body { padding-bottom: calc(24px + env(safe-area-inset-bottom)); }

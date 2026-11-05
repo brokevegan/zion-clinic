@@ -103,8 +103,10 @@ document.addEventListener("change", e => {
 
 const FILTERS = {};
 const LIST_ROWS = {};
-function filt(page, defaults) { return FILTERS[page] || (FILTERS[page] = Object.assign({limit: 100, search: ""}, defaults || {})); }
-const RANGE_NAMES = ["Today", "This week", "This month", "Last month", "This year", "Last year", "All time"];
+const TABLE_ROWS = 500;   // lines a history table shows before Show more
+function filt(page, defaults) { return FILTERS[page] || (FILTERS[page] = Object.assign({limit: 100, first: 100, search: ""}, defaults || {})); }
+const tableFilters = defaults => Object.assign({limit: TABLE_ROWS, first: TABLE_ROWS, range: "All time"}, defaults);
+const RANGE_NAMES = ["All time", "Today", "This week", "This month", "Last month", "This year", "Last year"];
 
 function rangeOf(name) {
   const t = new Date(), y = t.getFullYear(), m = t.getMonth();
@@ -142,7 +144,7 @@ document.addEventListener("input", e => {
   if (!page) return;
   const f = filt(page);
   f.search = e.target.value;
-  f.limit = 100;
+  f.limit = f.first;
   clearTimeout(f.timer);
   f.timer = setTimeout(() => refreshResults(page), 200);
 });
@@ -151,17 +153,39 @@ document.addEventListener("change", e => {
   if (!page) return;
   const f = filt(page);
   f[e.target.dataset.filter] = e.target.type === "checkbox" ? e.target.checked : e.target.value;
-  f.limit = 100;
+  f.limit = f.first;
   refreshResults(page);
 });
 ACTIONS.showMore = d => { filt(d.page).limit += 200; refreshResults(d.page); };
+
+const moreButton = (page, n) => `<button class="wide small" data-act="showMore" data-page="${page}">Show more (${n.toLocaleString("en-US")} more)</button>`;
 
 function limited(page, rows, rowHtml) {
   const f = filt(page), shown = rows.slice(0, f.limit);
   let h = shown.map(rowHtml).join("");
   if (!rows.length) h = `<div class="empty">Nothing matches.</div>`;
-  if (rows.length > shown.length) h += `<button class="wide small" data-act="showMore" data-page="${page}">Show more (${(rows.length - shown.length).toLocaleString("en-US")} more)</button>`;
+  if (rows.length > shown.length) h += moreButton(page, rows.length - shown.length);
   return h;
+}
+
+/* A history list laid out as the computer's table: the same columns in the same order, newest first.
+   cols: [heading, class, value(row)]; class r = right, c = centre, w = long text, s = stays in view when sliding sideways.
+   rowAttrs(row): what a tap on the line does, and its colour. */
+function historyTable(page, cols, rows, rowAttrs) {
+  if (!rows.length) return `<div class="empty">Nothing matches.</div>`;
+  const shown = rows.slice(0, filt(page).limit);
+  return `<p class="muted hint">Slide the table sideways for every column. Tap a line to change or delete it.</p>
+    <div class="history"><table class="hist"><thead><tr>${cols.map(c => `<th class="${c[1]}">${esc(c[0])}</th>`).join("")}</tr></thead><tbody>` +
+    shown.map(r => `<tr ${rowAttrs(r)}>${cols.map(c => `<td class="${c[1]}">${esc(c[2](r))}</td>`).join("")}</tr>`).join("") +
+    `</tbody></table></div>` + (rows.length > shown.length ? moreButton(page, rows.length - shown.length) : "");
+}
+
+/* The age as the computer's table shows it: 34 y, 6 m, 3 wk. */
+function ageShown(raw, years) {
+  if (years === null || years === undefined) return raw || "";
+  if (years >= 1) return `${Math.floor(years)} y`;
+  const months = Math.round(years * 12);
+  return months >= 1 ? `${months} m` : `${Math.max(1, Math.round(years * 52))} wk`;
 }
 
 const contains = (s, q) => String(s === null || s === undefined ? "" : s).toLowerCase().includes(q);
@@ -172,7 +196,7 @@ const money = n => (n === null || n === undefined || n === "" ? "" : ZR.fmtNum(n
 // ------------------------------------------------------------------ Patient Billing
 
 PAGES.billing = () => {
-  filt("billing", {range: "This month"});
+  filt("billing", tableFilters({status: ""}));
   return `${noData()}<div class="stats" id="todayStats">${todayStats()}</div>
     <button class="primary wide" data-act="visitNew">+ New visit</button>
     ${searchBox("billing", "Search name, diagnosis, contact…")}
@@ -196,11 +220,13 @@ LIST_ROWS.billing = () => {
   }).sort((x, y) => (y.visit_date || "").localeCompare(x.visit_date || "") || y.id - x.id);
   const billed = rows.reduce((s, v) => s + (v.billed || 0), 0), paid = rows.reduce((s, v) => s + (v.paid || 0), 0);
   return `<p class="muted">${rows.length.toLocaleString("en-US")} visits · billed ${money(billed)} · received ${money(paid)} · owed ${money(billed - paid)}</p>` +
-    limited("billing", rows, v => `<div class="card row" data-act="visitEdit" data-uid="${esc(v.uid)}">
-      <div class="grow"><div class="name">${esc(v.patient)}${v.age ? ` <span class="muted">${esc(v.age)}</span>` : ""}</div>
-        <div class="muted">${esc(ZR.fmtDate(v.visit_date))}${v.diagnosis ? " · " + esc(v.diagnosis) : ""}</div></div>
-      <div class="amt">${money(v.paid || 0)}<br><span class="status ${v.status === "Paid" ? "st-sent" : v.status === "Partial" ? "st-changed" : "st-new"}">${esc(v.status || "")}</span></div></div>`);
+    historyTable("billing", BILLING_COLS, rows, v => `data-act="visitEdit" data-uid="${esc(v.uid)}" class="${BILLING_COLOUR[v.status] || ""}"`);
 };
+
+const BILLING_COLOUR = {Unpaid: "c-out", Partial: "c-warn", "Not recorded": "c-muted"};
+const BILLING_COLS = [["Date", "", v => ZR.fmtDate(v.visit_date)], ["Patient", "s", v => v.patient], ["Age", "c", v => ageShown(v.age, v.age_years)],
+  ["Contact", "", v => v.contact], ["Diagnosis", "w", v => v.diagnosis], ["Billed", "r", v => money(v.billed)], ["Paid", "r", v => money(v.paid || 0)],
+  ["Balance", "r", v => (v.billed === null || v.billed === undefined ? "" : money(v.billed - (v.paid || 0)))], ["Status", "c", v => v.status]];
 
 function visitForm(v) {
   const values = v ? Object.assign({}, v) : {visit_date: today(), billed: DEFAULT_FEE, paid: 0};
@@ -226,9 +252,12 @@ ACTIONS.visitEdit = d => visitForm(Clinic.by.invoices.get(d.uid));
 
 // ------------------------------------------------------------------ all immunisation lines
 
-PAGES.immlist = () => {
-  filt("imm", {range: "This month", vaccine: "", programme: "", location: ""});
-  return segments([["home", "Daily tallies"], ["immlist", "All immunisation lines"]], "immlist") + noData() +
+PAGES.immlist = () => segments([["home", "Daily tallies"], ["immlist", "All immunisation lines"]], "immlist") + immHistory();
+
+/* Every immunisation line, as on the computer's Immunizations page. Also shown under the saved tallies. */
+function immHistory() {
+  filt("imm", tableFilters({vaccine: "", programme: "", location: ""}));
+  return noData() +
     `<button class="primary wide" data-act="immNew">+ Add a line</button>
     ${searchBox("imm", "Search vaccine, place, notes…")}
     <div class="filters">${filterSelect("imm", "range", "Dates", RANGE_NAMES)}
@@ -236,7 +265,7 @@ PAGES.immlist = () => {
       ${filterSelect("imm", "programme", "Programme", [["", "All programmes"]].concat(LISTS.programmes))}
       ${filterSelect("imm", "location", "Location", [["", "All locations"]].concat(Clinic.locations()))}</div>
     <div id="results">${LIST_ROWS.imm()}</div>`;
-};
+}
 
 LIST_ROWS.imm = () => {
   const f = filt("imm"), [a, b] = rangeOf(f.range), q = f.search.trim().toLowerCase();
@@ -249,11 +278,12 @@ LIST_ROWS.imm = () => {
   }).sort((x, y) => y.imm_date.localeCompare(x.imm_date) || y.id - x.id);
   const m = rows.reduce((s, r) => s + (r.male || 0), 0), w = rows.reduce((s, r) => s + (r.female || 0), 0), t = rows.reduce((s, r) => s + (r.total || 0), 0);
   return `<p class="muted">${rows.length.toLocaleString("en-US")} lines · Male ${money(m)} · Female ${money(w)}${t - m - w ? ` · Sex not recorded ${money(t - m - w)}` : ""} · Total ${money(t)} doses</p>` +
-    limited("imm", rows, r => `<div class="card row" data-act="immEdit" data-uid="${esc(r.uid || "")}" data-session="${esc(r.session || "")}">
-      <div class="grow"><div class="name">${esc(immLabel(r.vaccine, r.dose || "", r.age_group || ""))}</div>
-        <div class="muted">${esc(ZR.fmtDate(r.imm_date))} · ${esc(r.location || "")} · ${esc(r.programme || "")}${r.session ? " · on a tally" : ""}</div></div>
-      <div class="amt"><b>${money(r.total)}</b><br><span class="muted">M ${r.male === null ? "–" : r.male} F ${r.female === null ? "–" : r.female}</span></div></div>`);
+    historyTable("imm", IMM_COLS, rows, r => `data-act="immEdit" data-uid="${esc(r.uid || "")}" data-session="${esc(r.session || "")}" class="${r.programme === "Campaign" ? "c-camp" : ""}"`);
 };
+
+const IMM_COLS = [["Date", "", r => ZR.fmtDate(r.imm_date)], ["Vaccine", "s", r => r.vaccine], ["Dose", "c", r => r.dose], ["Age group", "", r => r.age_group],
+  ["Programme", "", r => r.programme], ["Location", "", r => r.location], ["Male", "r", r => r.male], ["Female", "r", r => r.female], ["Total", "r", r => r.total],
+  ["Post / notes", "w", r => [r.post, r.notes].filter(Boolean).join("; ")]];
 
 function immForm(r) {
   const opts = Clinic.immOptions();
@@ -324,7 +354,7 @@ ACTIONS.immEdit = d => {
 // ------------------------------------------------------------------ Eye Camps
 
 PAGES.eye = () => {
-  filt("eye", {camp: "", cond: "", sex: "", age: "", district: ""});
+  filt("eye", tableFilters({camp: "", cond: "", sex: "", age: "", district: ""}));
   const camps = Array.from(new Set(Clinic.t.eye_patients.map(r => r.camp_date))).sort().reverse();
   return `${noData()}<button class="primary wide" data-act="eyeNew">+ New patient</button>
     ${searchBox("eye", "Search name, address, findings…")}
@@ -350,11 +380,12 @@ LIST_ROWS.eye = () => {
   }).sort((x, y) => y.camp_date.localeCompare(x.camp_date) || x.patient.toLowerCase().localeCompare(y.patient.toLowerCase()));
   const sum = c => rows.reduce((s, r) => s + (r[c] ? 1 : 0), 0);
   return `<p class="muted">${rows.length.toLocaleString("en-US")} patients · ${rows.filter(r => r.sex === "M").length} male · ${rows.filter(r => r.sex === "F").length} female · cataract ${sum("cataract")} · reading glasses ${sum("presbyopia")} · referred ${sum("referred")}</p>` +
-    limited("eye", rows, r => `<div class="card row" data-act="eyeEdit" data-uid="${esc(r.uid)}">
-      <div class="grow"><div class="name">${esc(r.patient)} <span class="muted">${esc(r.age || "")} ${esc(r.sex || "")}</span></div>
-        <div class="muted">${esc(ZR.fmtDate(r.camp_date))}${r.district ? " · " + esc(r.district) : ""}${r.glasses ? " · " + esc(r.glasses) : ""}</div>
-        <div class="muted">${esc(eyeConditions(r) || r.findings || "")}</div></div></div>`);
+    historyTable("eye", EYE_COLS, rows, r => `data-act="eyeEdit" data-uid="${esc(r.uid)}"`);
 };
+
+const EYE_COLS = [["Camp", "", r => ZR.fmtDate(r.camp_date)], ["Patient", "s", r => r.patient], ["Age", "c", r => r.age], ["Sex", "c", r => r.sex], ["District", "", r => r.district],
+  ["Visual acuity", "", r => (r.visual_acuity || "").split(/\s+/).join(" ").trim()], ["Findings / treatment", "w", r => r.findings], ["Conditions", "w", r => eyeConditions(r)],
+  ["Glasses", "c", r => r.glasses]];
 
 function eyeForm(r, keep) {
   const values = r ? Object.assign({}, r) : {camp_date: keep ? keep.camp_date : today(), district: keep ? keep.district : "", sex: ""};
@@ -391,7 +422,7 @@ ACTIONS.eyeEdit = d => eyeForm(Clinic.by.eye_patients.get(d.uid));
 const HIV_LABEL = {"<15": "Under 15", "15-24": "15-24", "25-49": "25-49", "50+": "50 and over"};
 
 PAGES.hiv = () => {
-  filt("hiv", {range: "This year", age: "", result: "", location: ""});
+  filt("hiv", tableFilters({age: "", result: "", location: ""}));
   return `${noData()}<div class="row2"><button class="primary" data-act="hivNew">+ Add a line</button>
       <button data-act="goTab" data-tab="home">Count on a tally</button></div>
     ${searchBox("hiv", "Search place, notes…")}
@@ -413,11 +444,11 @@ LIST_ROWS.hiv = () => {
   }).sort((x, y) => y.test_date.localeCompare(x.test_date) || y.id - x.id);
   const t = rows.reduce((s, r) => s + (r.total || 0), 0), pos = rows.filter(r => r.result === "Positive").reduce((s, r) => s + (r.total || 0), 0);
   return `<p class="muted">Tested ${money(t)} · Negative ${money(t - pos)} · Positive ${money(pos)}${t ? ` (${ZR.pyFixed(100 * pos / t, 1)}%)` : ""}</p>` +
-    limited("hiv", rows, r => `<div class="card row" data-act="hivEdit" data-uid="${esc(r.uid || "")}" data-session="${esc(r.session || "")}">
-      <div class="grow"><div class="name ${r.result === "Positive" ? "pos" : ""}">${esc(HIV_LABEL[r.age_group] || r.age_group || "")} · ${esc(r.result)}</div>
-        <div class="muted">${esc(ZR.fmtDate(r.test_date))} · ${esc(r.location || "")}${r.session ? " · on a tally" : ""}</div></div>
-      <div class="amt"><b>${money(r.total)}</b><br><span class="muted">M ${r.male} F ${r.female}</span></div></div>`);
+    historyTable("hiv", HIV_COLS, rows, r => `data-act="hivEdit" data-uid="${esc(r.uid || "")}" data-session="${esc(r.session || "")}" class="${r.result === "Positive" ? "c-out" : ""}"`);
 };
+
+const HIV_COLS = [["Date", "s", r => ZR.fmtDate(r.test_date)], ["Location", "", r => r.location], ["Age group", "", r => HIV_LABEL[r.age_group] || r.age_group],
+  ["Result", "", r => r.result], ["Male", "r", r => r.male], ["Female", "r", r => r.female], ["Total", "r", r => r.total], ["Notes", "w", r => r.notes]];
 
 function hivForm(r) {
   const values = r ? Object.assign({}, r) : {test_date: today(), location: filt("hiv").lastLocation || "", result: "", age_group: ""};
@@ -451,10 +482,10 @@ ACTIONS.hivEdit = d => {
 const costLabel = c => { const x = Clinic.reportData().codeName[c]; return x ? `${c} - ${x}` : "(no code yet)"; };
 
 PAGES.money = () => {
-  filt("money", {range: "This month", code: "*", auto: true});
+  filt("money", tableFilters({code: "*", auto: true}));
   const D = Clinic.reportData();
   const cash = D.entries.reduce((s, e) => s + e.amount_in - e.amount_out, 0);
-  return segments([["money", "Ledger"], ["names", "Names & Staff"]], "money") + noData() +
+  return (FINANCE ? "" : segments([["money", "Ledger"], ["names", "Names & Staff"]], "money")) + noData() +
     `<div class="stats"><b>Cash balance:</b> ${money(cash)} UGX</div>
     <button class="primary wide" data-act="entryNew">+ New entry</button>
     ${searchBox("money", "Search description, name, amount…")}
@@ -473,11 +504,16 @@ LIST_ROWS.money = () => {
     return !q || [e.description, e.from_party, e.to_party, e.code, e.notes, e.amount_in, e.amount_out, money(e.amount_in), money(e.amount_out), ZR.fmtDate(e.date)].some(x => contains(x, q));
   }).reverse();
   const tin = rows.reduce((s, e) => s + e.amount_in, 0), tout = rows.reduce((s, e) => s + e.amount_out, 0);
+  const balance = new Map(), rowOf = new Map(Clinic.t.ledger.map(r => [r.id, r]));
+  let running = 0;
+  for (const e of D.entries) { running += e.amount_in - e.amount_out; balance.set(e, running); }
+  const hasReceipt = e => { const r = rowOf.get(e.id); return !!r && !!(Clinic.ledgerPhotos[r.uid] || r.receipt_uid); };
+  const cols = [["Date", "", e => ZR.fmtDate(e.date)], ["Code", "c", e => e.code || "?"], ["Description", "s", e => e.description],
+    ["Money In", "r", e => (e.amount_in ? money(e.amount_in) : "")], ["Money Out", "r", e => (e.amount_out ? money(e.amount_out) : "")],
+    ["From", "", e => e.from_party], ["To", "", e => e.to_party], ["Balance", "r", e => money(balance.get(e))], ["Notes", "w", e => e.notes],
+    ["Receipt", "c", e => (hasReceipt(e) ? "✓" : "")]];
   return `<p class="muted">${rows.length.toLocaleString("en-US")} entries · in ${money(tin)} · out ${money(tout)} · net ${money(tin - tout)}</p>` +
-    limited("money", rows, e => `<div class="card row" data-act="entryEdit" data-id="${e.id === null ? "" : e.id}" data-date="${esc(e.date || "")}">
-      <div class="grow"><div class="name">${esc(e.description || "(no description)")}</div>
-        <div class="muted">${esc(ZR.fmtDate(e.date))} · ${esc(e.code || "no code")}${e.amount_in ? (e.from_party ? " · from " + esc(e.from_party) : "") : (e.to_party ? " · to " + esc(e.to_party) : "")}</div></div>
-      <div class="amt ${e.amount_in ? "neg" : "pos"}"><b>${e.amount_in ? "+" + money(e.amount_in) : "-" + money(e.amount_out)}</b></div></div>`);
+    historyTable("money", cols, rows, e => `data-act="entryEdit" data-id="${e.id === null ? "" : e.id}" data-date="${esc(e.date || "")}" class="${[e.auto ? "c-auto" : e.amount_out ? "c-out" : "", e.code ? "" : "c-uncoded"].join(" ")}"`);
 };
 
 function entryForm(r, preset) {
@@ -549,7 +585,7 @@ async function splitEntry(r) {
 ACTIONS.entryNew = () => entryForm(null);
 ACTIONS.entryEdit = d => {
   if (!d.id) {
-    toast("Daily patient income comes from Patient Billing.");
+    toast(FINANCE ? "Daily patient income comes from the visits recorded at the clinic." : "Daily patient income comes from Patient Billing.");
     return;
   }
   const r = Clinic.t.ledger.find(x => x.id === Number(d.id));
@@ -590,3 +626,5 @@ ACTIONS.nameToggle = d => {
   Clinic.add({op: Clinic.hidden.has(d.name.toLowerCase()) ? "name_show" : "name_hide", name: d.name});
   render(false);
 };
+
+if (FINANCE) PAGES.home = PAGES.money;

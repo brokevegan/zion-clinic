@@ -14,6 +14,7 @@ const Clinic = {
   load() {
     let raw = null;
     try { raw = readBig("base"); this.base = raw ? JSON.parse(raw) : null; } catch (e) { this.base = null; }
+    if (FINANCE && this.base && !this.base.money_only) { moneyOnly(this.base); writeFile("base", JSON.stringify(this.base)); }
     try { this.ops = JSON.parse(readBig("changes") || "[]"); } catch (e) { this.ops = []; }
     this.rebuild();
   },
@@ -289,6 +290,20 @@ const Clinic = {
     return this.D;
   },
 };
+
+/* Zion Finance keeps the money only: as soon as a copy of the records arrives, patient details and the immunisation,
+   eye camp and HIV records are taken out of it. Daily patient income still comes from what each visit billed and paid. */
+function moneyOnly(b) {
+  const inv = b.tables.invoices, keep = new Set(["id", "uid", "visit_date", "billed", "paid", "status"]);
+  const gone = inv.cols.map((c, i) => (keep.has(c) ? -1 : i)).filter(i => i >= 0);
+  for (const r of inv.rows) for (const i of gone) r[i] = null;
+  const sheets = b.tables.imm_photos, uid = sheets.cols.indexOf("uid"), tally = new Set(sheets.rows.map(r => r[uid]));
+  b.photos = (b.photos || []).filter(u => !tally.has(u));
+  for (const name of ["immunisations", "eye_patients", "hiv_tests", "imm_photos"]) b.tables[name].rows = [];
+  b.dx_map = [];
+  b.imm_extra = [];
+  b.money_only = true;
+}
 
 function fromSession(source, ids) {
   if (!source || !source.startsWith("phone:")) return false;

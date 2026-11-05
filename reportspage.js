@@ -2,14 +2,16 @@
    (WhatsApp, Gmail, Drive...), or as an Excel file. */
 "use strict";
 
-const R = {kind: ZR.KINDS.money[0], preset: "This year", from: "", to: "", ticks: {}, search: "", person: "", dx: "", immLoc: "", immProg: "",
+const REPORT_KINDS = FINANCE ? {money: Object.keys(ZR.CASH_FLOW).concat(Object.keys(ZR.EXPENSES))} : ZR.KINDS;
+const R = {kind: REPORT_KINDS.money[0], preset: "This year", from: "", to: "", ticks: {}, search: "", person: "", dx: "", immLoc: "", immProg: "",
   eyeDist: "", hivLoc: "", detail: true, inc: {table: true, pies: true, bars: true, line: false, photos: false}, page: "auto", rep: null, file: null};
 const REPORT_PRESETS = ["This month", "Last month", "This quarter", "This year", "Last year", "Today", "This week", "All time", "Custom dates"];
-const REPORT_GROUPS = {money: "Revenue & expenses", visits: "Patient visits", imm: "Immunisations", eye: "Eye camps", hiv: "HIV tests", receipts: "Receipts"};
+const REPORT_GROUPS = {money: FINANCE ? "Cash flow and expenses" : "Revenue & expenses", visits: "Patient visits", imm: "Immunisations", eye: "Eye camps", hiv: "HIV tests", receipts: "Receipts"};
 const PREVIEW_ROWS = 300;
 
 function reportMode() { return ZR.modeOf(R.kind); }
 const isCash = () => !!ZR.CASH_FLOW[R.kind];
+const isExpenses = () => !!ZR.EXPENSES[R.kind];
 
 function tickItems() {
   const D = Clinic.reportData(), s = D.snap, m = reportMode();
@@ -28,8 +30,8 @@ function currentTicks() {
 PAGES.reports = () => {
   if (!Clinic.has()) return noData();
   const D = Clinic.reportData(), s = D.snap, m = reportMode(), cash = isCash();
-  const kinds = Object.keys(ZR.KINDS).map(g => `<optgroup label="${esc(REPORT_GROUPS[g])}">` +
-    ZR.KINDS[g].map(k => `<option ${k === R.kind ? "selected" : ""}>${esc(k)}</option>`).join("") + `</optgroup>`).join("");
+  const kinds = Object.keys(REPORT_KINDS).map(g => `<optgroup label="${esc(REPORT_GROUPS[g])}">` +
+    REPORT_KINDS[g].map(k => `<option ${k === R.kind ? "selected" : ""}>${esc(k)}</option>`).join("") + `</optgroup>`).join("");
   const sel = (key, label, options, first) => `<label class="label">${esc(label)}</label><select data-r="${key}">` +
     (first ? `<option value="">${esc(first)}</option>` : "") +
     options.map(o => `<option ${o === R[key] ? "selected" : ""}>${esc(o)}</option>`).join("") + `</select>`;
@@ -39,7 +41,7 @@ PAGES.reports = () => {
   if (m === "imm") extra = sel("immLoc", "Location", s.imm_locations, "All locations") + sel("immProg", "Programme", s.imm_programmes, "All programmes");
   if (m === "eye") extra = sel("eyeDist", "District", s.eye_districts, "All districts");
   if (m === "hiv") extra = sel("hivLoc", "Location", s.hiv_locations, "All locations");
-  if (cash) extra = `<label class="check"><input type="checkbox" data-r="detail" ${R.detail ? "checked" : ""}> List every entry under each period</label>`;
+  if (cash || isExpenses()) extra = `<label class="check"><input type="checkbox" data-r="detail" ${R.detail ? "checked" : ""}> List every entry under each period</label>`;
   const on = new Set(currentTicks()), items = tickItems();
   const tickLabel = {imm: "Vaccines", visits: "Diagnosis groups", eye: "Conditions", hiv: "Age groups", receipts: "Cost codes"}[m] || "Categories";
   const ticks = cash ? `<p class="muted">Every category is included, so the balances are true.</p>` :
@@ -48,7 +50,7 @@ PAGES.reports = () => {
         ${m === "money" || m === "receipts" ? `<button data-act="tickAll" data-q="rev">Revenue</button><button data-act="tickAll" data-q="exp">Expenses</button>` : ""}</div>
       ${items.map(([k, label], i) => `<label class="check"><input type="checkbox" data-tick="${i}" ${on.has(k) ? "checked" : ""}> ${esc(label)}</label>`).join("")}</details>`;
   const box = (key, label, off) => `<label class="check ${off ? "off" : ""}"><input type="checkbox" data-inc="${key}" ${R.inc[key] && !off ? "checked" : ""} ${off ? "disabled" : ""}> ${esc(label)}</label>`;
-  const photoLabel = m === "receipts" ? "Receipt photos" : cash ? "Cash book photos" : "Tally sheet photos";
+  const photoLabel = m === "receipts" || isExpenses() ? "Receipt photos" : cash ? "Cash book photos" : "Tally sheet photos";
   return `<h2 style="margin-top:4px">Reports</h2>
     <p class="muted">Records up to ${esc(Clinic.base.made ? ZR.fmtDate(Clinic.base.made.slice(0, 10)) : "")}${Clinic.pendingCount() ? " plus changes on this phone" : ""}.</p>
     <div class="card form">
@@ -62,14 +64,14 @@ PAGES.reports = () => {
     </div>
     <div class="card form"><div class="name">Include in the PDF</div>
       ${box("table", "Table")}${box("pies", "Pie charts")}${box("bars", m === "eye" ? "Bar graph by age group" : "Bar graph by month")}
-      ${box("line", {imm: "Doses line graph", visits: "Visits line graph", hiv: "Tests line graph"}[m] || "Balance line graph", m === "eye" || m === "receipts")}
-      ${box("photos", photoLabel, !(m === "imm" || m === "receipts" || cash))}
+      ${box("line", {imm: "Doses line graph", visits: "Visits line graph", hiv: "Tests line graph"}[m] || "Balance line graph", m === "eye" || m === "receipts" || isExpenses())}
+      ${box("photos", photoLabel, !(m === "imm" || m === "receipts" || cash || isExpenses()))}
       <label class="label">Page</label><select data-r="page"><option value="auto" ${R.page === "auto" ? "selected" : ""}>Automatic</option>
         <option value="portrait" ${R.page === "portrait" ? "selected" : ""}>Portrait (tall)</option><option value="landscape" ${R.page === "landscape" ? "selected" : ""}>Landscape (wide)</option></select>
     </div>
     <button class="send wide" data-act="reportPdf" id="pdfBtn">Make PDF</button>
     <div class="grid2"><button data-act="reportShow">Show on screen</button><button data-act="reportXlsx">Make Excel file</button></div>
-    <button class="wide small" data-act="exportAll">Export everything to Excel</button>
+    ${FINANCE ? "" : `<button class="wide small" data-act="exportAll">Export everything to Excel</button>`}
     <div id="ready">${readyHtml()}</div>
     <div id="repOut"></div>`;
 };
@@ -132,6 +134,10 @@ async function reportPhotos(rep) {
     title = "Cash book photos"; empty = "No cash book photos for these dates.";
     list = Clinic.t.cash_photos.filter(r => r.page_date >= rep.start && r.page_date <= rep.end).sort((a, b) => a.page_date.localeCompare(b.page_date) || a.id - b.id)
       .map(r => ({uid: r.uid, caption: [ZR.fmtDate(r.page_date), r.label, r.notes].filter(Boolean).join("  ·  ")}));
+  } else if (ZR.EXPENSES[rep.title]) {
+    title = "Receipt photos"; empty = "No receipt photos for these dates.";
+    list = Clinic.t.phone_receipts.filter(r => r.receipt_date >= rep.start && r.receipt_date <= rep.end).sort((a, b) => a.receipt_date.localeCompare(b.receipt_date) || a.id - b.id)
+      .map(r => ({uid: r.uid, caption: [ZR.fmtDate(r.receipt_date), r.code, r.amount === null || r.amount === undefined ? "" : ZR.fmtNum(r.amount) + " UGX"].filter(Boolean).join("  ·  ")}));
   } else {
     title = "Tally sheet photos"; empty = "No tally sheet photos have been added for these months.";
     const a = rep.start.slice(0, 7), b = rep.end.slice(0, 7);
@@ -186,9 +192,9 @@ Object.assign(ACTIONS, {
     btn.textContent = "Making PDF…";
     await new Promise(r => setTimeout(r, 40));   // let the button change show before the work starts
     try {
-      const m = reportMode(), wantPhotos = R.inc.photos && (m === "imm" || m === "receipts" || isCash());
+      const m = reportMode(), wantPhotos = R.inc.photos && (m === "imm" || m === "receipts" || isCash() || isExpenses());
       const extra = wantPhotos ? await reportPhotos(rep) : {};
-      const doc = ZPDF.make(Clinic.reportData(), rep, {table: R.inc.table, pies: R.inc.pies, bars: R.inc.bars, line: R.inc.line && m !== "eye" && m !== "receipts",
+      const doc = ZPDF.make(Clinic.reportData(), rep, {table: R.inc.table, pies: R.inc.pies, bars: R.inc.bars, line: R.inc.line && m !== "eye" && m !== "receipts" && !isExpenses(),
         orientation: R.page, search: rep._p.search, photos: extra.photos, photosTitle: extra.photosTitle, photosEmpty: extra.photosEmpty}, window.ZION_LOGO);
       const uri = doc.output("datauristring");
       handOver(ZPDF.fileName(rep, rep._p.dx), uri.slice(uri.indexOf(",") + 1));
