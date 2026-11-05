@@ -1,5 +1,6 @@
 /* Zion Clinic: turns a report into a PDF that looks like the computer's (zion_pdf.py):
-   logo and title, optional pie charts, bar graph and line graph, the table, then any photos. Uses jsPDF. */
+   logo and title, optional pie charts, bar graph and line graph, the table, the individual entries,
+   then any photos. Uses jsPDF. */
 (function (global) {
   "use strict";
 
@@ -41,7 +42,7 @@
 
   function make(D, rep, opts, logo) {
     const { jsPDF } = global.jspdf;
-    const wide = rep.columns.length > 8;
+    const wide = rep.columns.length > 8 || (opts.entries && opts.entries.columns.length > 8);
     const landscape = opts.orientation === "landscape" || (opts.orientation === "auto" && wide);
     const doc = new jsPDF({ unit: "pt", format: "a4", orientation: landscape ? "landscape" : "portrait", compress: true });
     const pageW = doc.internal.pageSize.getWidth(), pageH = doc.internal.pageSize.getHeight();
@@ -115,20 +116,20 @@
       y += 210 + 5 * MM;
     }
 
-    // ---------------------------------------------------------------- table
-    if (opts.table) {
+    // ---------------------------------------------------------------- tables
+    const table = r => {
       if (y + 60 * MM > bottom) { doc.addPage(); y = margin; }
-      const money = new Set(rep.money_cols);
-      const right = new Set(rep.money_cols);
-      rep.columns.forEach((c, i) => { if (c === "Entries" || c === "Visits") right.add(i); });
-      const totals = new Set(rep.total_rows);
-      const body = rep.rows.map(row => row.map((v, i) =>
+      const money = new Set(r.money_cols);
+      const right = new Set(r.money_cols);
+      r.columns.forEach((c, i) => { if (c === "Entries" || c === "Visits") right.add(i); });
+      const totals = new Set(r.total_rows);
+      const body = r.rows.map(row => row.map((v, i) =>
         clean(typeof v === "number" && money.has(i) ? ZR.fmtNum(v) : v === null || v === undefined ? "" : String(v))));
-      const fit = fitColumns(doc, rep, body, right, width, wide ? 7.5 : 8);
+      const fit = fitColumns(doc, r, body, right, width, r.columns.length > 8 ? 7.5 : 8);
       const columnStyles = {};
       fit.widths.forEach((w, i) => { columnStyles[i] = { cellWidth: w, halign: right.has(i) ? "right" : "left" }; });
       doc.autoTable({
-        head: [rep.columns.map(clean)], body: body, startY: y, theme: "plain",
+        head: [r.columns.map(clean)], body: body, startY: y, theme: "plain",
         margin: { left: margin, right: margin, top: margin, bottom: 16 * MM },
         styles: { font: "helvetica", fontSize: fit.size, textColor: INK, valign: "top", overflow: "linebreak",
           cellPadding: { top: 2.5, bottom: 2.5, left: 3, right: 3 }, lineColor: RULE,
@@ -144,9 +145,18 @@
         },
       });
       y = doc.lastAutoTable.finalY;
-    }
+    };
+    if (opts.table) table(rep);
     if (rep.note) { y += 4 * MM; para(rep.note, 9.5, INK_2); }
-    if (!(opts.table || opts.pies || opts.bars || opts.line || (opts.photos && opts.photos.length))) {
+    if (opts.entries) {
+      y += 7 * MM;
+      if (y + 60 * MM > bottom) { doc.addPage(); y = margin; }
+      font(14, true, ACCENT);
+      text("Individual entries", margin, y);
+      y += 22;
+      table(opts.entries);
+    }
+    if (!(opts.table || opts.entries || opts.pies || opts.bars || opts.line || (opts.photos && opts.photos.length))) {
       para("Nothing was chosen to include.", 9.5, INK_2);
     }
 
@@ -188,12 +198,14 @@
     return doc;
   }
 
-  /* Column widths from the report's proportions, except that numbers and single words never break:
-     number columns get at least their widest figure, and the text shrinks (down to 5 pt) until they fit. */
+  /* Column widths from the report's proportions, except that numbers, dates and single words never break:
+     those columns get at least their widest entry, and the text shrinks (down to 5 pt) until they fit. */
   function fitColumns(doc, rep, body, right, width, size) {
     const ws = rep.widths && rep.widths.length ? rep.widths : rep.columns.map(() => 1);
     const total = ws.reduce((a, b) => a + b, 0), pad = 6.5;
     const longestWord = s => s.split(/\s+/).reduce((m, w) => Math.max(m, doc.getTextWidth(w)), 0);
+    const dates = new Set();
+    rep.columns.forEach((c, i) => { if (c === "Date" || c === "Camp") dates.add(i); });
     let widths = ws.map(w => w * width / total);
     for (let fs = size; fs >= 5; fs -= 0.5) {
       doc.setFont("helvetica", "bold");
@@ -201,13 +213,14 @@
       const need = rep.columns.map((c, i) => {
         let w = longestWord(c);
         if (right.has(i)) for (const row of body) w = Math.max(w, doc.getTextWidth(row[i]));
+        if (dates.has(i)) for (const row of body) w = Math.max(w, longestWord(row[i]));
         return w + pad;
       });
       const fixed = ws.map((w, i) => Math.max(w * width / total, need[i]));
       const over = fixed.reduce((a, b) => a + b, 0) - width;
       if (over <= 0.5) return { size: fs, widths: fixed.map(w => w - Math.max(0, over) / fixed.length) };
       // take the extra room from text columns wider than they need
-      const spare = fixed.map((w, i) => (right.has(i) ? 0 : Math.max(0, w - need[i])));
+      const spare = fixed.map((w, i) => (right.has(i) || dates.has(i) ? 0 : Math.max(0, w - need[i])));
       const spareSum = spare.reduce((a, b) => a + b, 0);
       if (spareSum >= over) {
         return { size: fs, widths: fixed.map((w, i) => w - spare[i] * over / spareSum) };

@@ -4,7 +4,7 @@
 
 const REPORT_KINDS = FINANCE ? {money: Object.keys(ZR.CASH_FLOW).concat(Object.keys(ZR.EXPENSES))} : ZR.KINDS;
 const R = {kind: REPORT_KINDS.money[0], preset: "This year", from: "", to: "", ticks: {}, search: "", person: "", dx: "", immLoc: "", immProg: "",
-  eyeDist: "", hivLoc: "", detail: true, inc: {table: true, pies: true, bars: true, line: false, photos: false}, page: "auto", rep: null, file: null};
+  eyeDist: "", hivLoc: "", inc: {table: true, pies: true, bars: true, line: false, entries: true, photos: false}, page: "auto", rep: null, file: null};
 const REPORT_PRESETS = ["This month", "Last month", "This quarter", "This year", "Last year", "Today", "This week", "All time", "Custom dates"];
 const REPORT_GROUPS = {money: FINANCE ? "Cash flow and expenses" : "Revenue & expenses", visits: "Patient visits", imm: "Immunisations", eye: "Eye camps", hiv: "HIV tests", receipts: "Receipts"};
 const PREVIEW_ROWS = 300;
@@ -41,7 +41,6 @@ PAGES.reports = () => {
   if (m === "imm") extra = sel("immLoc", "Location", s.imm_locations, "All locations") + sel("immProg", "Programme", s.imm_programmes, "All programmes");
   if (m === "eye") extra = sel("eyeDist", "District", s.eye_districts, "All districts");
   if (m === "hiv") extra = sel("hivLoc", "Location", s.hiv_locations, "All locations");
-  if (cash || isExpenses()) extra = `<label class="check"><input type="checkbox" data-r="detail" ${R.detail ? "checked" : ""}> List every entry under each period</label>`;
   const on = new Set(currentTicks()), items = tickItems();
   const tickLabel = {imm: "Vaccines", visits: "Diagnosis groups", eye: "Conditions", hiv: "Age groups", receipts: "Cost codes"}[m] || "Categories";
   const ticks = cash ? `<p class="muted">Every category is included, so the balances are true.</p>` :
@@ -51,7 +50,7 @@ PAGES.reports = () => {
       ${items.map(([k, label], i) => `<label class="check"><input type="checkbox" data-tick="${i}" ${on.has(k) ? "checked" : ""}> ${esc(label)}</label>`).join("")}</details>`;
   const box = (key, label, off) => `<label class="check ${off ? "off" : ""}"><input type="checkbox" data-inc="${key}" ${R.inc[key] && !off ? "checked" : ""} ${off ? "disabled" : ""}> ${esc(label)}</label>`;
   const photoLabel = m === "receipts" || isExpenses() ? "Receipt photos" : cash ? "Cash book photos" : "Tally sheet photos";
-  return `<h2 style="margin-top:4px">Reports</h2>
+  return `${FINANCE ? `<h2 style="margin-top:4px">Reports</h2>` : ""}
     <p class="muted">Records up to ${esc(Clinic.base.made ? ZR.fmtDate(Clinic.base.made.slice(0, 10)) : "")}${Clinic.pendingCount() ? " plus changes on this phone" : ""}.</p>
     <div class="card form">
       <label class="label">Report</label><select data-r="kind">${kinds}</select>
@@ -65,6 +64,7 @@ PAGES.reports = () => {
     <div class="card form"><div class="name">Include in the PDF</div>
       ${box("table", "Table")}${box("pies", "Pie charts")}${box("bars", m === "eye" ? "Bar graph by age group" : "Bar graph by month")}
       ${box("line", {imm: "Doses line graph", visits: "Visits line graph", hiv: "Tests line graph"}[m] || "Balance line graph", m === "eye" || m === "receipts" || isExpenses())}
+      ${box("entries", ZR.listsEntries(R.kind) ? "Line by line entries (this report's table already lists them)" : "Line by line entries, after the charts", ZR.listsEntries(R.kind))}
       ${box("photos", photoLabel, !(m === "imm" || m === "receipts" || cash || isExpenses()))}
       <label class="label">Page</label><select data-r="page"><option value="auto" ${R.page === "auto" ? "selected" : ""}>Automatic</option>
         <option value="portrait" ${R.page === "portrait" ? "selected" : ""}>Portrait (tall)</option><option value="landscape" ${R.page === "landscape" ? "selected" : ""}>Landscape (wide)</option></select>
@@ -89,7 +89,7 @@ function reportParams() {
   }
   if (R.from && R.to && R.from > R.to) throw new Error("The From date is after the To date.");
   return {kind: R.kind, start: R.from || null, end: R.to || null, ticks, search: isCash() ? "" : R.search.trim(), person: R.person.trim(), dx: R.dx.trim(),
-    location: m === "imm" ? R.immLoc : R.hivLoc, programme: R.immProg, district: R.eyeDist, detail: R.detail};
+    location: m === "imm" ? R.immLoc : R.hivLoc, programme: R.immProg, district: R.eyeDist, detail: R.inc.entries};
 }
 
 function buildReport() {
@@ -194,7 +194,10 @@ Object.assign(ACTIONS, {
     try {
       const m = reportMode(), wantPhotos = R.inc.photos && (m === "imm" || m === "receipts" || isCash() || isExpenses());
       const extra = wantPhotos ? await reportPhotos(rep) : {};
-      const doc = ZPDF.make(Clinic.reportData(), rep, {table: R.inc.table, pies: R.inc.pies, bars: R.inc.bars, line: R.inc.line && m !== "eye" && m !== "receipts" && !isExpenses(),
+      const D = Clinic.reportData(), periods = isCash() || isExpenses();
+      // A cash flow or expenses report: its table has the period totals, and the entries come after the charts.
+      const main = periods ? ZR.build(D, Object.assign({}, rep._p, {detail: false})) : rep;
+      const doc = ZPDF.make(D, main, {entries: R.inc.entries ? ZR.entries(D, rep._p) : null, table: R.inc.table, pies: R.inc.pies, bars: R.inc.bars, line: R.inc.line && m !== "eye" && m !== "receipts" && !isExpenses(),
         orientation: R.page, search: rep._p.search, photos: extra.photos, photosTitle: extra.photosTitle, photosEmpty: extra.photosEmpty}, window.ZION_LOGO);
       const uri = doc.output("datauristring");
       handOver(ZPDF.fileName(rep, rep._p.dx), uri.slice(uri.indexOf(",") + 1));

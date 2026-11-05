@@ -174,6 +174,19 @@ table.rep tr.total td { background: var(--green-light); font-weight: 700; }
 .toast { z-index: 30; }
 .modal { z-index: 20; }
 
+/* Zion Clinic's home screen, and the logo that comes back to it from any screen */
+.logobtn { flex: none; min-height: 0; padding: 0; background: transparent; border-radius: 8px; line-height: 0; }
+.tabbar.hidden { display: none; }
+.has-home .top { position: sticky; top: 0; z-index: 8; box-shadow: 0 2px 3px rgba(0,0,0,0.08); }
+.has-home .top .app-name { font-size: 20px; line-height: 1.15; }
+.has-home .jump { top: calc(54px + env(safe-area-inset-top, 0px)); }
+.menu { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 6px; }
+.menu.one { grid-template-columns: 1fr; }
+.menu button { min-height: 104px; padding: 10px; background: #fff; border: 2px solid var(--line); border-radius: 16px; color: var(--green-dark); font-size: 18px; box-shadow: 0 1px 2px rgba(0,0,0,0.08); }
+.menu button:active { background: var(--green-light); }
+.menu button:last-child:nth-child(odd) { grid-column: 1 / -1; }
+.menu button .muted { display: block; margin-top: 4px; font-weight: 400; }
+
 /* History lists: the computer's table, headings and one column kept in view while it slides */
 .hint { margin: 2px 0 6px; font-size: 13px; }
 .history { overflow: auto; max-height: 72vh; background: #fff; border: 1px solid var(--line); border-radius: 10px; }

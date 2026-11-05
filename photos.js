@@ -124,11 +124,18 @@ const PHOTO_KINDS = {
 
 const isPending = uid => Clinic.ops.some(o => o.uid === uid);
 
+/* Zion Clinic: the Photos button on the home screen comes here, to choose the kind of photo first. */
+PAGES.photos = () => {
+  const count = kind => { const n = Clinic.t[PHOTO_KINDS[kind].table].length; return `<span class="muted">${n} photo${n === 1 ? "" : "s"}</span>`; };
+  return `<p class="muted">What is the photo of?</p><div class="menu one">` +
+    Object.keys(PHOTO_KINDS).map(kind => `<button data-act="goTab" data-tab="${kind}">${esc(PHOTO_KINDS[kind].title)}${count(kind)}</button>`).join("") + `</div>`;
+};
+
 for (const kind of Object.keys(PHOTO_KINDS)) {
   const K = PHOTO_KINDS[kind];
   PAGES[kind] = () => {
     filt(kind, {year: ""});
-    return `<h2 style="margin-top:4px">${esc(K.title)}</h2><p class="muted">${esc(K.intro)}</p>
+    return `${FINANCE ? `<h2 style="margin-top:4px">${esc(K.title)}</h2>` : `<button class="back" data-act="goTab" data-tab="photos">‹ Photos</button>`}<p class="muted">${esc(K.intro)}</p>
       <div class="grid2"><button class="primary" data-act="photoNew" data-kind="${kind}" data-how="camera">📷 Take photo</button>
         <button data-act="photoNew" data-kind="${kind}" data-how="gallery">🖼 Choose photo</button></div>
       ${searchBox(kind, "Search date, label…")}

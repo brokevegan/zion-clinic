@@ -1,6 +1,8 @@
 /* Starts the app: the lock first, and only then are the clinic's records read and shown. */
 "use strict";
 
+document.body.classList.toggle("has-home", !FINANCE);
+
 function start() {
   Clinic.load();
   // Receipts from app version 1.1 become photos like the others (those already sent are simply replaced).

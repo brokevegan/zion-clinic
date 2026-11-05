@@ -883,8 +883,24 @@
     return hivReport(D, p.kind, p.start, p.end, p.ticks, search, p.location || "");
   }
 
+  const ENTRY_LISTS = { money: "All transactions", visits: "Visit list by diagnosis", imm: "Immunisation entries (all)",
+    eye: "Eye camp patient list", hiv: "HIV test entries (all)" };
+
+  /* Is this report's own table already one line per entry? */
+  function listsEntries(kind) {
+    return kind === BY_PERSON || modeOf(kind) === "receipts" || ENTRY_LISTS[modeOf(kind)] === kind;
+  }
+
+  /* The individual records behind a report, for the PDF after its charts: the list report of the same
+     kind with the same choices (a cash flow or expenses report: its periods with their entries underneath). */
+  function entries(D, p) {
+    if (listsEntries(p.kind)) return null;
+    if (CASH_FLOW[p.kind] || EXPENSES[p.kind]) return build(D, Object.assign({}, p, { detail: true }));
+    return build(D, Object.assign({}, p, { kind: ENTRY_LISTS[modeOf(p.kind)] }));
+  }
+
   global.ZR = {
     CLINIC, UNCODED, UNCODED_LABEL, BY_PERSON, CASH_FLOW, EXPENSES, KINDS, NONE_LABEL, HIV_AGE_GROUPS, HIV_AGE_LABEL, NOT_MAPPED, NOT_RECORDED,
-    MONTHS, modeOf, prepare, build, caption, codeLabel, fmtNum, fmtDate, pyFixed, pyRound, isoToday, monthList,
+    MONTHS, modeOf, prepare, build, entries, listsEntries, caption, codeLabel, fmtNum, fmtDate, pyFixed, pyRound, isoToday, monthList,
   };
 })(typeof window !== "undefined" ? window : globalThis);

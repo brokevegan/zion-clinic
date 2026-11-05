@@ -142,17 +142,22 @@ function summaryText(s) {
 }
 
 // ------------------------------------------------------------------ screens
-let view = {name: "home"};
+const ROOT = FINANCE ? "home" : "menu";   // Zion Clinic starts on its home screen, Zion Finance on the ledger (PAGES.home in pages.js)
+let view = {name: ROOT};
 let flashId = null;
 
-/* The tabs along the top, and which tab each screen belongs to. */
-const TABS = FINANCE ? [["money", "Revenue & Expenses"], ["receipt", "Receipts"], ["cash", "Cash Book"], ["reports", "Reports"]] :
-  [["home", "Tallies"], ["billing", "Patient Billing"], ["eye", "Eye Camps"], ["hiv", "HIV Tests"],
-    ["money", "Revenue & Expenses"], ["reports", "Reports"], ["tally", "Tally Sheets"], ["cash", "Cash Book"], ["receipt", "Receipts"]];
-const TAB_OF = {session: "home", immlist: "home", names: "money", sync: ""};
-if (FINANCE) TAB_OF.home = "money";   // its first screen is the ledger (PAGES.home in pages.js)
+/* Zion Clinic: the sections on the home screen, and the name shown beside the logo on each screen. */
+const MENU = [["home", "Tallies"], ["billing", "Patient Billing"], ["eye", "Eye Camps"], ["hiv", "HIV Tests"],
+  ["money", "Revenue & Expenses"], ["reports", "Reports"], ["photos", "Photos"]];
+const TITLES = {menu: APP_TITLE, home: "Tallies", immlist: "Tallies", session: "Tallies", billing: "Patient Billing", eye: "Eye Camps", hiv: "HIV Tests",
+  money: "Revenue & Expenses", names: "Revenue & Expenses", reports: "Reports", photos: "Photos", tally: "Tally Sheets", cash: "Cash Book", receipt: "Receipts", sync: "Sync"};
+
+/* Zion Finance: the tabs along the top, and which tab each screen belongs to. */
+const TABS = FINANCE ? [["money", "Revenue & Expenses"], ["receipt", "Receipts"], ["cash", "Cash Book"], ["reports", "Reports"]] : [];
+const TAB_OF = {names: "money", sync: "", home: "money"};
 const PAGES = {};
 const BACK = {session: "home", immlist: "home", names: "money"};   // the phone's back button
+if (!FINANCE) Object.assign(BACK, {tally: "photos", cash: "photos", receipt: "photos"});
 
 /* Remember the tally being worked on, so the app reopens on it (it is used on and off all day). */
 function go(v) { view = v; remember(); render(true); }
@@ -166,7 +171,7 @@ const current = () => DATA.sessions.find(s => s.id === view.id);
 function render(top) {
   const y = window.scrollY;
   if (view.name === "session" && !current()) view = {name: "home"};
-  const page = PAGES[view.name] || PAGES.home;
+  const page = PAGES[view.name] || PAGES[ROOT];
   $("#view").innerHTML = page(view);
   drawTabs();
   window.scrollTo(0, top ? 0 : y);
@@ -182,10 +187,12 @@ function waitingCount() { return toSend().length + DATA.deleted.length + Clinic.
 function drawTabs() {
   const on = TAB_OF[view.name] !== undefined ? TAB_OF[view.name] : view.tabName || view.name;
   const bar = $("#tabs");
+  bar.classList.toggle("hidden", !TABS.length);
   bar.innerHTML = TABS.map(([k, label]) => `<button class="${k === on ? "on" : ""}" data-act="goTab" data-tab="${k}">${esc(label)}</button>`).join("");
   const active = bar.querySelector(".on");
   if (active && bar.dataset.on !== on) active.scrollIntoView({inline: "center", block: "nearest"});
   bar.dataset.on = on;
+  if (!FINANCE) $(".top .app-name").textContent = TITLES[view.tabName || view.name] || APP_TITLE;
   const n = waitingCount(), badge = $("#syncBadge");
   badge.textContent = n;
   badge.classList.toggle("hidden", !n);
@@ -376,6 +383,7 @@ function resolveRef(s, ref) {
 
 var ACTIONS = {
   home() { go({name: "home"}); },
+  goHome() { go({name: ROOT}); },
   goTab(d) { go({name: d.tab}); },
   open(d) { go({name: "session", id: d.id, tab: "imm"}); },
   tab(d) { view.tab = d.tab; remember(); render(false); },
@@ -613,7 +621,7 @@ window.zionBack = function () {
   if (!$("#modal").classList.contains("hidden")) { closeSheet(null); return true; }
   if (Lock.showing()) return false;
   if (view.back) { go(view.back); return true; }
-  if (view.name !== "home") { go({name: BACK[view.name] || "home"}); return true; }
+  if (view.name !== ROOT) { go({name: BACK[view.name] || ROOT}); return true; }
   return false;
 };
 
@@ -627,3 +635,5 @@ document.addEventListener("click", e => {
 document.addEventListener("change", onChange);
 PAGES.home = renderHome;
 PAGES.session = () => renderSession(current());
+PAGES.menu = () => `${noData()}<div class="menu">` +
+  MENU.map(([k, label]) => `<button data-act="goTab" data-tab="${k}">${esc(label)}</button>`).join("") + `</div>`;
